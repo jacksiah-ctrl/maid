@@ -9,11 +9,15 @@
   },
   "scripts": {
     "ingest-biodata": "tsx scripts/ingest-biodata.ts",
+    "dev:server": "tsx watch src/server.ts",
+    "start:server": "tsx src/server.ts",
+    "simulate-webhook": "tsx scripts/simulate-webhook.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
     "dotenv": "^16.4.5",
+    "fastify": "^5.1.0",
     "pdf-parse": "^1.1.1"
   },
   "devDependencies": {
