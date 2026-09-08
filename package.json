@@ -1,0 +1,25 @@
+{
+  "name": "maid-whatsapp-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "WhatsApp agent prototype for a Singapore MDW placement agency",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "ingest-biodata": "tsx scripts/ingest-biodata.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.4",
+    "dotenv": "^16.4.5",
+    "pdf-parse": "^1.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/pdf-parse": "^1.1.4",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.2"
+  }
+}
