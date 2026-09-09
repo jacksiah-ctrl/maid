@@ -15,7 +15,7 @@ one — it's not what it might look like from the file names).
 - [x] **Phase 0** — seed data (redacted) + written analysis
 - [x] **Phase 1** — biodata ingestion
 - [x] **Phase 2** — WhatsApp transport
-- [ ] Phase 3 — agent loop
+- [x] **Phase 3** — agent loop
 - [ ] Phase 4 — guardrails & operator handoff
 - [ ] Phase 5 — eval harness
 
@@ -101,12 +101,12 @@ gap thresholds for a new PDF that comes out mangled.
 A Fastify server (`src/server.ts`) with the Cloud API webhook contract:
 `GET /webhook` for Meta's one-time verification handshake, `POST /webhook`
 for inbound events — signature-verified, acked in milliseconds, processed
-after. `src/webhook/receive.ts` is an **echo bot**: text in, same text back
-out; images/documents are downloaded via the two-step media flow and
-acknowledged. Every inbound and outbound message is persisted to the
+after. `src/webhook/receive.ts` was originally an **echo bot** (text in,
+same text back out) to prove the pipe worked with no model behind it yet —
+Phase 3 has since replaced the reply logic with the real agent loop; what
+Phase 2 actually still owns is dedupe, persistence, and the two-step media
+download. Every inbound and outbound message is persisted to the
 `messages` table (or its dry-run JSONL stand-in — same pattern as Phase 1).
-This whole phase is deliberately dumb — no model, no FAQ logic — it exists
-to prove the pipe works before Phase 3 puts an agent behind it.
 
 **Database**: apply `db/migrations/0002_messages.sql` (in order, after
 `0001_init.sql`).
@@ -143,11 +143,16 @@ This spawns the actual Fastify server as a child process and drives it
 with signed, realistic Cloud API payloads to check: the verification
 handshake (right token / wrong token), signature rejection on a bad HMAC,
 a valid signed POST getting a **fast** 200 (measured — proves the handler
-truly acks before processing, not just eventually), the echo reply and
-both message rows landing in the dry-run log, and — the one most worth
-watching — the exact same message id POSTed twice (simulating a Meta
-webhook retry) producing **no duplicate rows**. All 9 checks pass; see the
-output of that command for the live run.
+truly acks before processing, not just eventually), the inbound message
+landing in the dry-run log, the exact same message id POSTed twice
+(simulating a Meta webhook retry) producing **no duplicate rows**, and —
+added once Phase 3 wired the agent in behind this — that the server stays
+healthy after the 4s debounce fires and the agent call fails closed (no
+`ANTHROPIC_API_KEY` here) rather than taking the process down. All 9
+checks pass; see the output of that command for the live run. As of Phase
+3 this harness no longer asserts a reply's *content* — replying now runs
+through a real model call, which it deliberately doesn't fake; see
+`npm run simulate-agent` below for that.
 
 ### What you need to do to get the real proof (a live number over ngrok)
 
@@ -170,8 +175,10 @@ output of that command for the live run.
    Verify and Save — this is the `GET /webhook` handshake firing for real.
    Subscribe to the `messages` field.
 7. From your own phone, WhatsApp the test number Meta gave you. You should
-   see it logged by the running server and get the same text echoed back
-   within a second or two — that's the real end-to-end proof.
+   see it logged by the running server and get a real reply back within a
+   few seconds (the agent loop, as of Phase 3 — not an echo anymore; also
+   set `ANTHROPIC_API_KEY` in `.env` first, see Phase 3 below) — that's the
+   real end-to-end proof.
 
 **What's stubbed**: no real send/receive happened in this sandbox — steps
 1–7 above are yours to run. `messages.wa_to`/`wa_from` use the phone number
@@ -190,3 +197,108 @@ real Graph API error back and currently just throws — Phase 3/4 need to
 decide what "the bot's reply itself hit the 24h window" should do (in
 practice: rare, since it only replies to messages that just arrived, but
 worth stating rather than discovering live).
+
+## Phase 3 — agent loop
+
+An actual model behind the transport, replacing Phase 2's echo bot.
+`src/agent/loop.ts` is a manual Anthropic tool-use loop (not the SDK's beta
+tool runner — Phase 4's guardrails need to see and gate every tool call and
+candidate reply, and owning the loop keeps that in one obvious place for a
+prototype this size). `src/agent/scheduler.ts` debounces inbound messages
+per conversation by 4 seconds (a burst of rapid-fire texts collapses into
+one turn, fired 4s after the last message) and, on firing, reloads the
+**full** conversation thread from the `messages` table fresh — no
+in-memory chat state persists between turns, per the brief.
+
+Six tools, matching the brief exactly (`src/agent/tools/`):
+`search_helpers`, `calculate_cost`, `check_eligibility_guidance`,
+`create_lead`, `book_appointment`, `escalate_to_human` (this last one is an
+explicit **stub** — logs loudly, doesn't send anything real; the brief
+scopes real delivery to Phase 4). The system prompt is
+`src/agent/system-prompt.md` — a standalone editable file, not inline in
+code, written from `docs/phase0-analysis.md`'s findings including the
+agency's real register (Singlish-inflected, terse) and the 8 documented
+places a human gave information a bot must not repeat.
+
+**The one rule the whole prompt is built around**: every dollar figure,
+timeline, or eligibility statement has to come from a tool call in that
+turn, never from the model's memory. `config/fees.json` is the only source
+`calculate_cost` reads from, and it's honest about its gaps — only the
+Indonesian/new-helper combination is populated (the one real invoice in
+the seed data); everything else (transfer pricing, other nationalities,
+the MOM levy, MOM eligibility criteria) is `null` + `status: "TODO_VERIFY"`,
+and the tools are built to say so rather than estimate. **You need to fill
+in `TODO_AGENCY_NAME` and the EA license number at the top of
+`system-prompt.md`, and the whole of `config/mom-eligibility-reference.json`,
+before this talks to a real customer** — both are placeholder-only by
+design, since nothing in the seed data verifies either.
+
+**Database**: apply `db/migrations/0003_agent_tables.sql` (adds `leads`,
+`appointments`).
+
+**Run the server** exactly as in Phase 2 (`npm run dev:server`), plus set
+`ANTHROPIC_API_KEY` in `.env`. Optional: `ANTHROPIC_MODEL` (defaults to
+`claude-opus-5`) and `ANTHROPIC_EFFORT` (defaults to `medium` — chat + tool
+use doesn't need the higher effort levels tuned for hard reasoning; re-tune
+against the Phase 5 eval once it exists, don't hand-tune from vibes).
+
+### What was actually proven in this sandbox, and what wasn't
+
+No `ANTHROPIC_API_KEY` is available in this sandbox (checked via `ant auth
+status` and a live `messages.create` call — both confirm no credential is
+resolvable here), so the model itself was never actually called while
+building this. What **was** proven:
+
+```bash
+npm run simulate-agent
+```
+
+Part 1 (always runs, no API key needed) unit-tests all six tools directly
+— including asserting `calculate_cost`'s math reproduces the real invoice
+**exactly** ($5,510.57 subtotal → $192.65 GST → $5,703.22 total, matching
+`seed/reference/best-home-invoice-sample.md` to the cent), that
+`not_on_file` comes back honestly for every unpopulated combination
+(transfer pricing, non-Indonesian nationalities) instead of an estimate,
+that `search_helpers`' filters fail-safe on unknown fields rather than
+guessing a match, and that `create_lead`/`book_appointment` persist
+correctly. All these pass deterministically. Part 2 (a live-model smoke
+test against three real openers from the golden quotes) only runs if
+`ANTHROPIC_API_KEY` is set — it's explicitly not a graded eval, just a
+"does this actually work" check for a human to read.
+
+`npm run simulate-webhook` (Phase 2's harness) was re-run and updated:
+Phase 3 changed what happens on an inbound message, so its old "echo reply
+persisted with the same text" assertion no longer applies — it now checks
+instead that the debounced hand-off to the agent doesn't crash the server
+even when the model call fails (which it does here, for lack of a key).
+All 9 of its checks still pass.
+
+### What you need to do to get the real proof
+
+1. Set `ANTHROPIC_API_KEY` in `.env` (or run with it in the environment).
+2. `npm run simulate-agent` — Part 2 will now actually run and print three
+   real replies for you to read.
+3. For the full live loop: follow Phase 2's ngrok steps, then WhatsApp the
+   test number a real enquiry (e.g. "how much for an Indonesian helper?")
+   and watch the server logs — each tool call is printed as
+   `[agent tool] <name>(<input>) -> <result>` — before the reply arrives.
+
+**What's stubbed**: `escalate_to_human` logs to the server console only —
+no real WhatsApp alert, no conversation pause (both are explicitly Phase 4).
+`book_appointment`'s calendar integration is a placeholder row, not a real
+calendar. Debounce state lives in server memory (a restart mid-debounce
+just means the pending burst gets picked up as history on the next
+message, rather than firing on its own — documented, not silently
+ignored). Image/document messages are handed to the model as a bare
+`[sent a document]` placeholder with no identity-document detection or
+redaction yet — that's a Phase 4 hard-escalation trigger, not implemented
+here.
+
+**Biggest thing that will break first in real use**: `config/fees.json`
+and `config/mom-eligibility-reference.json` are both mostly TODO_VERIFY by
+design — the moment a real customer asks about a Filipino helper, a
+transfer case, or any MOM eligibility specifics, the bot will correctly
+say "I don't have that verified yet" and try to escalate. That's the
+intended safe behavior, not a bug, but it means this bot is genuinely only
+useful for the one scenario the seed data actually covers until someone
+fills in the rest of the config.

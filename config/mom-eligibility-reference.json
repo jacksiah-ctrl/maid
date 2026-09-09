@@ -1,0 +1,24 @@
+{
+  "_comment": "check_eligibility_guidance reads this file verbatim and returns it as reference text. It never computes a ruling from household_composition — that field is logged for lead context only. TODO_VERIFY throughout: nothing in the seed data (WhatsApp thread or invoice) states MOM's actual eligibility criteria, so nothing has been filled in. Populate each category's criteria_text with agency-verified, CEI-certified text — sourced from MOM directly — before this tool is trusted with real customers. Shipping this file exactly as-is means the bot currently tells every asker 'this isn't verified yet, ask a human' for every eligibility category, which is the correct, safe default until someone fills it in.",
+  "as_of": null,
+  "status": "TODO_VERIFY — unpopulated",
+  "categories": [
+    {
+      "key": "employer_age_and_residency_status",
+      "criteria_text": "TODO_VERIFY"
+    },
+    {
+      "key": "employer_income_or_pass_type",
+      "criteria_text": "TODO_VERIFY"
+    },
+    {
+      "key": "household_quota_and_concessions",
+      "criteria_text": "TODO_VERIFY"
+    },
+    {
+      "key": "security_bond_and_insurance",
+      "criteria_text": "TODO_VERIFY"
+    }
+  ],
+  "always_append": "This is general reference information only, not a ruling on your specific eligibility — please verify current requirements directly with MOM (mom.gov.sg) or through a CEI-certified consultant at the agency."
+}

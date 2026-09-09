@@ -1,6 +1,6 @@
 # Biodata ingestion report
 
-Run: 2026-09-08T11:48:07.998Z
+Run: 2026-09-09T00:53:14.756Z
 Source directory: `seed/biodata`
 Mode: dry run (no Supabase credentials)
 

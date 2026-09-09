@@ -12,9 +12,11 @@
     "dev:server": "tsx watch src/server.ts",
     "start:server": "tsx src/server.ts",
     "simulate-webhook": "tsx scripts/simulate-webhook.ts",
+    "simulate-agent": "tsx scripts/simulate-agent.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.124.0",
     "@supabase/supabase-js": "^2.45.4",
     "dotenv": "^16.4.5",
     "fastify": "^5.1.0",

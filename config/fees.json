@@ -1,0 +1,54 @@
+{
+  "_comment": "Single editable source of truth for every dollar figure the agent quotes. calculate_cost reads ONLY from this file — never hardcode a number in code or in the system prompt. Every number here traces to seed/whatsapp-export.txt or seed/reference/best-home-invoice-sample.md. Where the seed data doesn't cover a case, the value is null and status is TODO_VERIFY — the tool must say so, never guess.",
+  "currency": "SGD",
+
+  "nationalities": {
+    "INDONESIAN": {
+      "new_helper": {
+        "status": "populated",
+        "source": "seed/reference/best-home-invoice-sample.md — real invoice IVC032016, dated 04-Jul-2026, Indonesian first-timer helper (Lestari) via a replacement application (i.e. this employer already had a different helper being replaced — administratively this is the 'recruit from overseas' cost shape, not a straight in-country transfer)",
+        "one_time_items": [
+          { "key": "agency_service_fee", "label": "Agency service fee (first-timer)", "amount": 938.00, "gst_taxable": true, "note": "invoice charge $1288.00 less $350.00 discount applied on this case — the discount is NOT guaranteed to repeat, quote the post-discount figure but flag it as this case's number, not a list price" },
+          { "key": "medical_exam", "label": "1st full medical examination", "amount": 55.05, "gst_taxable": true },
+          { "key": "settling_in_programme", "label": "Settling-in Programme (SIP)", "amount": 70.09, "gst_taxable": true },
+          { "key": "work_permit_application", "label": "Work permit application & e-issuance", "amount": 70.00, "gst_taxable": false },
+          { "key": "in_transit_transport", "label": "In-transit transport", "amount": 183.49, "gst_taxable": true, "note": "per the agency (chat, 5 Jul 2026): airport to medical centre, SIP course (2-way), fingerprinting trip office-to-MOM (2-way)" },
+          { "key": "insurance_2yr", "label": "Insurance plan (UOI Plus, 2 years)", "amount": 540.00, "gst_taxable": true },
+          { "key": "counter_indemnity_waiver", "label": "Waiver of counter indemnity (2 years)", "amount": 50.00, "gst_taxable": true },
+          { "key": "dormitory_accommodation", "label": "Accommodation in EA dormitory", "amount": 96.33, "gst_taxable": true },
+          { "key": "airfare", "label": "1-way airfare to Singapore", "amount": 137.61, "gst_taxable": true },
+          { "key": "placement_fee", "label": "Placement fee (from source)", "amount": 3300.00, "gst_taxable": false },
+          { "key": "embassy_contract", "label": "Indonesia embassy contract", "amount": 70.00, "gst_taxable": true }
+        ],
+        "gst_rate": 0.09,
+        "security_bond_or_deposit": { "amount": null, "status": "TODO_VERIFY", "note": "not itemised on the source invoice — MOM's security bond/insurance requirement varies by helper nationality and is MOM's rule, not the agency's; do not infer a number" }
+      },
+      "transfer": {
+        "status": "TODO_VERIFY",
+        "one_time_items": null,
+        "note": "No transfer-case invoice exists anywhere in the seed data — every real number on file is for recruiting a first-timer from overseas. A straight transfer (an in-Singapore helper switching employer) has a materially different, typically much lower cost shape (no placement fee, no airfare, no overseas medical/embassy steps). Do not estimate this by discounting the new_helper figures — escalate_to_human instead."
+      }
+    }
+  },
+
+  "guarantee_period": {
+    "value_months": 7,
+    "replacement_terms": "unlimited replacements within the 7-month window (agency's stated aim: helper lasts ~2 years)",
+    "source": "verbal statement from the agency's salesperson in chat, 4 Jul 2026 — NOT written on the invoice, not a MOM rule",
+    "caveat": "Quote as 'the agency has previously indicated ~7 months, unlimited replacement' — a service commitment from one conversation, not a guaranteed universal policy. If asked to put it in writing, hand off to a human."
+  },
+
+  "mom_levy": {
+    "amount_monthly": null,
+    "status": "TODO_VERIFY",
+    "note": "MOM's foreign domestic worker levy is set and changed by MOM, and varies by concession eligibility (e.g. households with young children, elderly, or persons with disabilities may qualify for the concessionary rate). This number does not appear anywhere in the seed data and must never be invented — MOM levy is explicitly not the agency's or this bot's call to make. Fill in only with a figure verified directly against MOM's published rate, dated."
+  },
+
+  "salary_reference": {
+    "note": "Anecdotal data points from the WhatsApp thread — two specific Indonesian candidates' self-quoted expected salary in mid-2026. This is NOT a nationality-wide salary table and must never be presented as one. calculate_cost takes helper_salary as an input (the specific helper's actual agreed/quoted salary) rather than looking it up here — these examples exist only so the agent can ground a 'what's a typical range' question in real data instead of guessing, while being explicit about the n=2 sample.",
+    "examples": [
+      { "nationality": "INDONESIAN", "helper": "Lestari", "basic_monthly": 550, "per_off_day_worked": 21.20 },
+      { "nationality": "INDONESIAN", "helper": "Nurfitriana", "basic_monthly": 600, "per_off_day_worked": 23.10 }
+    ]
+  }
+}

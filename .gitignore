@@ -3,8 +3,11 @@ dist/
 .env
 *.log
 
-# Transient runtime output (message logs, downloaded media) — not the
-# deliberate one-time proof artifacts like scripts/output/ingest-report.md
-# and helpers.dry-run.json, which ARE committed.
-scripts/output/messages.dry-run.jsonl
+# Transient runtime output (message/lead/appointment logs, downloaded
+# media) — not the deliberate one-time proof artifacts like
+# scripts/output/ingest-report.md and helpers.dry-run.json, which ARE
+# committed. All the *.jsonl dry-run logs are append-only runtime state,
+# not proof artifacts — scripts/simulate-agent.ts and simulate-webhook.ts
+# regenerate what they need on each run.
+scripts/output/*.dry-run.jsonl
 scripts/output/media/

@@ -1,17 +1,27 @@
 /**
- * Local proof harness for Phase 2, standing in for the real "echo bot over
- * ngrok on a live number" proof until real Meta credentials + a public URL
- * are available (see README's Phase 2 section for exactly what that needs
- * and why it can't happen inside this sandbox).
+ * Local proof harness for the WhatsApp TRANSPORT layer (Phase 2), standing
+ * in for the real "over ngrok on a live number" proof until real Meta
+ * credentials + a public URL are available (see README's Phase 2 section
+ * for exactly what that needs and why it can't happen inside this
+ * sandbox).
  *
  * Spins up the actual Fastify server as a child process, then drives it
  * with signed, realistic WhatsApp Cloud API webhook payloads to prove:
  *   1. GET /webhook verification handshake (correct + wrong token)
  *   2. POST /webhook rejects a bad/missing X-Hub-Signature-256
- *   3. POST /webhook acks fast (200 before processing finishes) and the
- *      echo bot actually persists + replies
+ *   3. POST /webhook acks fast (200 before processing finishes) and
+ *      persists the inbound message
  *   4. The exact same message id, POSTed twice (a Meta webhook retry), is
- *      deduped — no double-processing, no double reply
+ *      deduped — no double-processing
+ *   5. The Phase 3 debounce hand-off to the agent doesn't crash the server
+ *      even when it can't complete (no ANTHROPIC_API_KEY here) — the
+ *      failure is caught and logged, not left to take the process down
+ *
+ * As of Phase 3 this does NOT assert an echoed/generated reply — replying
+ * now goes through the real agent loop (a live model call), which this
+ * harness deliberately does not attempt to fake. See scripts/simulate-agent.ts
+ * for the agent's own proof (deterministic tool tests + an optional live
+ * smoke test when ANTHROPIC_API_KEY is set).
  *
  * Run: npm run simulate-webhook
  */
@@ -176,7 +186,7 @@ async function main() {
     });
     check("invalid signature -> 401", badSigRes.status === 401);
 
-    console.log("\nTest 3: POST /webhook with a valid signature — fast ack + echo reply");
+    console.log("\nTest 3: POST /webhook with a valid signature — fast ack + inbound persisted");
     const t0 = Date.now();
     const goodSigRes = await fetch(`${BASE_URL}/webhook`, {
       method: "POST",
@@ -185,24 +195,16 @@ async function main() {
     });
     const ackMs = Date.now() - t0;
     check("valid signature -> 200 immediately", goodSigRes.status === 200);
-    check(`ack was fast (${ackMs}ms) — proves it didn't wait on the reply send`, ackMs < 500);
+    check(`ack was fast (${ackMs}ms) — proves it didn't wait on debounce/agent scheduling`, ackMs < 500);
 
     // Wait for the fire-and-forget processing to actually land — not a
     // fixed sleep (see waitUntil's doc comment above).
-    const gotBothRows = await waitUntil(async () => {
+    const gotInbound = await waitUntil(async () => {
       const rows = await readDryRunMessages();
-      return (
-        rows.some((r) => r.wa_message_id === "wamid.TEST_MSG_001" && r.direction === "inbound") &&
-        rows.some((r) => r.direction === "outbound" && r.wa_to === "6591234567")
-      );
+      return rows.some((r) => r.wa_message_id === "wamid.TEST_MSG_001" && r.direction === "inbound");
     });
     let rows = await readDryRunMessages();
-    check("inbound message persisted", gotBothRows && rows.some((r) => r.wa_message_id === "wamid.TEST_MSG_001" && r.direction === "inbound"));
-    const outboundRow = rows.find((r) => r.direction === "outbound" && r.wa_to === "6591234567");
-    check(
-      "echo reply persisted with the same text back",
-      !!outboundRow && outboundRow.text_body === "hello, how much for a helper?",
-    );
+    check("inbound message persisted", gotInbound && rows.some((r) => r.wa_message_id === "wamid.TEST_MSG_001" && r.direction === "inbound"));
 
     console.log("\nTest 4: same message id POSTed again (simulating a Meta webhook retry) — must dedupe");
     const retryRes = await fetch(`${BASE_URL}/webhook`, {
@@ -221,6 +223,14 @@ async function main() {
       rowsAfterRetry.length === rows.length,
       `had ${rows.length} rows after first delivery, ${rowsAfterRetry.length} after retry`,
     );
+
+    console.log(
+      "\nTest 5: Phase 3's debounced agent hand-off doesn't crash the server even without ANTHROPIC_API_KEY " +
+        "(waiting past the 4s debounce window — the agent call is expected to fail here, and must fail closed: logged, not fatal)",
+    );
+    await sleep(4800);
+    const stillHealthy = await fetch(`${BASE_URL}/health`).then((r) => r.ok).catch(() => false);
+    check("server still responds to /health after the debounced agent turn ran (and failed) in the background", stillHealthy);
 
     console.log(`\n${failures === 0 ? "ALL CHECKS PASSED" : `${failures} CHECK(S) FAILED`}`);
     console.log(`Dry-run message log: ${path.relative(REPO_ROOT, DRY_RUN_MESSAGES_FILE)}`);
