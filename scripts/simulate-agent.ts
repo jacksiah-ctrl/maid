@@ -113,9 +113,14 @@ async function toolTests(): Promise<void> {
   const apptRows = await readJsonlRows("appointments.dry-run.jsonl");
   check("appointment row was written as pending_confirmation", apptRows.some((r) => r.status === "pending_confirmation" && r.conversation_id === CTX.conversationId));
 
-  console.log("\nescalate_to_human — stub is honest about not being real yet");
+  console.log("\nescalate_to_human — Phase 4's real flow (pause + alert attempt + escalations row)");
   const escalation = (await executeTool("escalate_to_human", { reason: "asked for a human", urgency: "high" }, CTX)) as any;
-  check("stub says so explicitly, doesn't claim a real alert was sent", escalation.status === "logged_stub_only");
+  check("tool reports escalated", escalation.status === "escalated");
+  check("tool result tells the model not to overclaim delivery", escalation.note?.toLowerCase().includes("don't claim"));
+  const { getConversation } = await import("../src/db/conversations.js");
+  check("conversation was actually paused", (await getConversation(CTX.conversationId))?.bot_paused === true);
+  const escalationRows = await readJsonlRows("escalations.dry-run.jsonl");
+  check("escalations table got a row for this call", escalationRows.some((r) => r.conversation_id === CTX.conversationId && r.reason === "asked for a human"));
 }
 
 async function liveModelSmokeTest(): Promise<void> {
@@ -157,6 +162,8 @@ async function main() {
   // not accumulated history from previous runs.
   await rm(path.join(OUTPUT_DIR, "leads.dry-run.jsonl"), { force: true });
   await rm(path.join(OUTPUT_DIR, "appointments.dry-run.jsonl"), { force: true });
+  await rm(path.join(OUTPUT_DIR, "escalations.dry-run.jsonl"), { force: true });
+  await rm(path.join(OUTPUT_DIR, "conversations.dry-run.json"), { force: true });
 
   await toolTests();
   await liveModelSmokeTest();

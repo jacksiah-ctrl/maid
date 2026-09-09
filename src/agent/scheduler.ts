@@ -5,6 +5,13 @@ import { loadConversationHistory } from "./history.js";
 import { runAgentTurn } from "./loop.js";
 import { sendText } from "../whatsapp/client.js";
 import { saveMessage } from "../db/messages.js";
+import { isBotPaused } from "../db/conversations.js";
+import { checkOutboundReply } from "../guardrails/preSend.js";
+import { isStuckWithNoProgress } from "../guardrails/noProgress.js";
+import { escalate } from "../escalation/escalate.js";
+
+const NO_PROGRESS_FALLBACK_REPLY = "Sorry, let me get one of our team to help with this — they'll follow up with you shortly!";
+const BLOCKED_REPLY_FALLBACK = "Let me check that properly and get back to you — connecting you with our team now.";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SYSTEM_PROMPT_PATH = path.join(__dirname, "system-prompt.md");
@@ -65,6 +72,16 @@ async function runWhenFree(conversationId: string, ourPhoneNumberId: string): Pr
 }
 
 async function runConversationTurn(conversationId: string, ourPhoneNumberId: string): Promise<void> {
+  // Authoritative bot_paused check, right before the model call — a hard
+  // trigger elsewhere may have paused this conversation AFTER it was
+  // scheduled but before the debounce timer fired (see receive.ts, which
+  // also checks this as a cheaper up-front skip; this is the check that
+  // actually matters).
+  if (await isBotPaused(conversationId)) {
+    console.log(`[paused] conversation ${conversationId} is paused — skipping the scheduled agent turn`);
+    return;
+  }
+
   const [systemPrompt, history] = await Promise.all([
     getSystemPrompt(),
     loadConversationHistory(conversationId),
@@ -76,9 +93,40 @@ async function runConversationTurn(conversationId: string, ourPhoneNumberId: str
     return;
   }
 
+  // Hard trigger: three consecutive bot turns with zero tool calls means
+  // the conversation is stuck. Fires regardless of what the model would
+  // say next — don't even call it.
+  if (await isStuckWithNoProgress(conversationId)) {
+    console.log(`[agent] conversation ${conversationId} stuck with no progress — escalating instead of calling the model`);
+    await escalate({ conversationId, reason: "Three consecutive replies made no progress (no tool calls)", urgency: "medium" });
+    await sendReply(conversationId, ourPhoneNumberId, NO_PROGRESS_FALLBACK_REPLY, []);
+    return;
+  }
+
   const { replyText, toolCallLog } = await runAgentTurn(systemPrompt, history, { conversationId });
   console.log(`[agent] conversation=${conversationId} tool_calls=${toolCallLog.length} reply="${replyText}"`);
 
+  const preSend = checkOutboundReply(replyText, toolCallLog);
+  if (preSend.blocked) {
+    console.error(`[guardrail] blocked outbound reply for conversation ${conversationId}: ${preSend.reason}. Draft was: "${replyText}"`);
+    await escalate({
+      conversationId,
+      reason: `Pre-send guardrail blocked a draft reply: ${preSend.reason}`,
+      urgency: "high",
+    });
+    await sendReply(conversationId, ourPhoneNumberId, BLOCKED_REPLY_FALLBACK, toolCallLog);
+    return;
+  }
+
+  await sendReply(conversationId, ourPhoneNumberId, replyText, toolCallLog);
+}
+
+async function sendReply(
+  conversationId: string,
+  ourPhoneNumberId: string,
+  replyText: string,
+  toolCallLog: Array<{ name: string; input: unknown }>,
+): Promise<void> {
   const { id: outboundId } = await sendText(conversationId, replyText);
   await saveMessage({
     wa_message_id: outboundId,

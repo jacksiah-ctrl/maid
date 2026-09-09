@@ -13,8 +13,14 @@ export interface MessageRecord {
   text_body?: string | null;
   media_id?: string | null;
   media_storage_path?: string | null;
+  media_redacted?: boolean;
+  media_flagged_reason?: string | null;
   wa_timestamp?: string | null; // ISO
   raw_payload?: unknown;
+}
+
+export interface StoredMessage extends MessageRecord {
+  created_at: string;
 }
 
 // --- Dry-run fallback: same pattern as scripts/ingest-biodata.ts. No
@@ -78,4 +84,32 @@ export async function saveMessage(record: MessageRecord): Promise<void> {
     if (error.code === "23505") return;
     throw new Error(`saveMessage insert failed: ${error.message}`);
   }
+}
+
+/** Last `limit` messages for a conversation, oldest first — used for escalation alerts and the no-progress guardrail. */
+export async function getRecentMessages(conversationId: string, limit: number): Promise<StoredMessage[]> {
+  const supabase = getSupabase();
+  if (!supabase) {
+    let contents: string;
+    try {
+      contents = await readFile(DRY_RUN_FILE, "utf-8");
+    } catch {
+      return [];
+    }
+    const rows = contents
+      .split("\n")
+      .filter((l) => l.trim())
+      .map((l) => JSON.parse(l) as StoredMessage)
+      .filter((r) => r.conversation_id === conversationId)
+      .sort((a, b) => a.created_at.localeCompare(b.created_at));
+    return rows.slice(-limit);
+  }
+  const { data, error } = await supabase
+    .from("messages")
+    .select("*")
+    .eq("conversation_id", conversationId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw new Error(`getRecentMessages query failed: ${error.message}`);
+  return ((data ?? []) as StoredMessage[]).reverse();
 }

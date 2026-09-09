@@ -1,0 +1,28 @@
+{
+  "_comment": "Hard escalation triggers that fire regardless of what the model would have done. Keyword lists are intentionally simple/greppable — this is a prototype guardrail, not an NLP classifier, and it's meant to fail toward escalating too often rather than too rarely. Edit these lists directly; no code change needed.",
+
+  "human_request_keywords": [
+    "speak to a human", "speak to someone", "talk to a human", "talk to a person",
+    "talk to someone", "real person", "can i call", "can you call me",
+    "get me an agent", "human agent", "customer service officer", "speak to staff"
+  ],
+
+  "complaint_keywords": [
+    "complain", "complaint", "unhappy", "disappointed", "angry", "frustrated",
+    "terrible", "scam", "cheat", "cheated", "refund", "not happy", "very bad",
+    "worst", "unacceptable", "disgusted", "furious"
+  ],
+
+  "payment_or_transfer_keywords": [
+    "paynow", "pay now", "bank transfer", "transfer $", "deposit", "payment link",
+    "send money", "wire transfer", "gpay", "paylah", "venmo", "swift code",
+    "account number", "iban"
+  ],
+
+  "no_progress_turn_threshold": 3,
+  "no_progress_note": "If the last N consecutive outbound (bot) turns for a conversation made zero tool calls, treat it as stuck and escalate rather than let it spin further.",
+
+  "pre_send_guardrail": {
+    "note": "Not a keyword list — src/guardrails/preSend.ts implements dollar-figure whitelisting (any $ amount in a draft reply must exactly match a number returned by a tool call this turn) and a date-commitment heuristic (a commitment verb near a date/timeframe token). Documented here so this file stays the single index of 'what guards this bot', even though the logic itself lives in code."
+  }
+}

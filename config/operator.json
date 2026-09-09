@@ -1,0 +1,13 @@
+{
+  "_comment": "Operator alert channel config. The WhatsApp number is fixed by the brief; the template name/language must match whatever you actually get approved in the Meta App Dashboard — see README's Phase 4 section for the exact submission steps. Until a template is approved, template_name is a placeholder and the template fallback path will fail (correctly logging loudly rather than pretending to succeed).",
+
+  "operator_whatsapp_number": "6580372668",
+
+  "alert_template": {
+    "name": "escalation_alert",
+    "language_code": "en",
+    "status": "TODO_VERIFY — not yet submitted/approved in the Meta App Dashboard",
+    "body_params_order": ["enquirer_name_or_number", "reason", "summary"],
+    "note": "The template body itself (submitted to Meta for approval, not editable at send-time) should read approximately: 'New enquiry escalation. From: {{1}}. Reason: {{2}}. Summary: {{3}}. Reply resume <number> or take <number>.' Update body_params_order here if the approved template's parameter order differs."
+  }
+}

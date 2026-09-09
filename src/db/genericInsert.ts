@@ -10,7 +10,7 @@ const OUTPUT_DIR = path.resolve(process.cwd(), "scripts", "output");
  * unique-constraint case). Dry-run rows append to
  * scripts/output/<table>.dry-run.jsonl.
  */
-export async function insertRow(table: string, row: Record<string, unknown>): Promise<void> {
+export async function insertRow<T extends object>(table: string, row: T): Promise<void> {
   const supabase = getSupabase();
   if (!supabase) {
     await mkdir(OUTPUT_DIR, { recursive: true });

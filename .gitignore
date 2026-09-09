@@ -10,4 +10,5 @@ dist/
 # not proof artifacts — scripts/simulate-agent.ts and simulate-webhook.ts
 # regenerate what they need on each run.
 scripts/output/*.dry-run.jsonl
+scripts/output/conversations.dry-run.json
 scripts/output/media/

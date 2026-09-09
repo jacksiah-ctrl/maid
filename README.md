@@ -16,7 +16,7 @@ one — it's not what it might look like from the file names).
 - [x] **Phase 1** — biodata ingestion
 - [x] **Phase 2** — WhatsApp transport
 - [x] **Phase 3** — agent loop
-- [ ] Phase 4 — guardrails & operator handoff
+- [x] **Phase 4** — guardrails & operator handoff
 - [ ] Phase 5 — eval harness
 
 ## Setup
@@ -302,3 +302,142 @@ say "I don't have that verified yet" and try to escalate. That's the
 intended safe behavior, not a bug, but it means this bot is genuinely only
 useful for the one scenario the seed data actually covers until someone
 fills in the rest of the config.
+
+## Phase 4 — guardrails and operator handoff
+
+Escalation is now a real notification attempt, not just a database row.
+`src/escalation/escalate.ts` is the single place this happens: it pauses
+the conversation (`conversations.bot_paused`), tries a free-form WhatsApp
+alert to the operator (`+6580372668`, `config/operator.json`), falls back
+to an approved template if that fails, and — if **both** fail — logs a
+loud, impossible-to-miss block to stderr and records `status=undelivered`
+in the `escalations` table. That failure mode is treated as the worst one
+in this system, per the brief, and is proven to actually behave that way
+(see below), not just documented as an intention.
+
+**Hard triggers** (`src/guardrails/hardTriggers.ts`) fire before the
+message ever reaches the model: an explicit request for a human, a
+complaint, a payment/transfer mention (keyword lists in
+`config/escalation-rules.json`, edit freely), and — scoped to images only,
+not PDFs, see the code comment for why — anything that might be a
+passport/NRIC photo. A flagged image is downloaded and stored (the agency
+may legitimately need it for the actual MOM application) but marked
+`media_redacted=true` and **never** turned into model input; a text
+placeholder update in Phase 3 already meant images were never sent to the
+model, Phase 4 adds the explicit flag and the automatic escalation.
+
+**Pre-send guardrail** (`src/guardrails/preSend.ts`): every draft reply is
+checked before it goes out. Any `$` figure in the text must exactly match
+a number some tool call actually returned this turn, or the reply is
+blocked. Any commitment-verb-near-a-date-token pattern ("will be ready by
+Monday", "guaranteed within 10 days") is blocked too. Both are regex
+heuristics, not an NLP judge — deliberately over-cautious; a blocked reply
+triggers a real escalation and a safe fallback message instead of just
+silently retrying.
+
+**No-progress guardrail** (`src/guardrails/noProgress.ts`): if the last 3
+consecutive bot replies in a conversation made zero tool calls, the next
+turn escalates instead of running the model a 4th time.
+
+**Operator commands**: reply to the alert in WhatsApp with `resume
+<number>` or `take <number>` (handled in
+`src/escalation/operatorCommands.ts`, triggered when an inbound message's
+sender matches `config/operator.json`'s number) — or run the CLI
+equivalent: `npm run toggle-pause -- resume 6591234567` /
+`... -- take 6591234567` / `... -- status 6591234567`.
+
+**Database**: apply `db/migrations/0004_guardrails.sql` (adds
+`conversations`, `escalations`, and two columns on `messages`).
+
+### The escalation template — submission steps
+
+The free-form alert only works within WhatsApp's 24h customer-service
+window (i.e. the operator messaged the bot's number in the last 24h). For
+outside that window, you need an **approved message template** submitted
+in the Meta App Dashboard:
+
+1. Meta App Dashboard → WhatsApp → Message Templates → Create Template.
+2. Category: **Utility** (this is an operational alert, not marketing —
+   utility templates have a much faster/more reliable approval path).
+3. Name it exactly `escalation_alert` (matches `config/operator.json`'s
+   `alert_template.name` — change both together if you rename it).
+4. Language: English.
+5. Body text (three variables, in this order — matches
+   `alert_template.body_params_order` in `config/operator.json`):
+   ```
+   New enquiry escalation. From: {{1}}. Reason: {{2}}. Summary: {{3}}. Reply resume <number> or take <number>.
+   ```
+6. Submit for review. Meta typically approves utility templates within
+   minutes to a few hours; you'll get a dashboard notification either way.
+7. Once approved, no code or config change is needed — `escalate.ts`
+   already reads the template name from `config/operator.json` and will
+   start succeeding on the fallback path instead of hitting the
+   loud-failure log.
+
+**Until this is approved, the template fallback will fail** — correctly,
+loudly, and by design (see "what was actually proven" below). That's not
+a bug to work around before shipping; it's the intended fail-safe state
+until you've actually done this Meta-side step.
+
+### What was actually proven in this sandbox, and what wasn't
+
+No live WhatsApp credentials exist here (same as Phases 2–3), so no real
+alert reached a real phone. What **was** proven, deterministically:
+
+```bash
+npm run simulate-guardrails
+```
+
+18 checks, all passing: the three hard-trigger keyword categories fire
+(and ordinary FAQ text doesn't), identity-document scoping is image-only,
+the pre-send guardrail blocks an unapproved dollar figure and a date
+commitment while allowing a tool-approved figure and non-committal
+scheduling language through, the no-progress guardrail fires at exactly
+the threshold, and — the one that matters most — `escalate()`'s full
+three-way delivery outcome: free-form succeeds; free-form fails and the
+template rescues it; **both fail and it's logged loudly, with
+`status=undelivered` recorded**, never silent. That last path is only
+testable via dependency injection (`escalate()` takes an optional `deps`
+param — see its doc comment) since neither a real free-form send nor a
+real template send is reachable without live credentials; the injection
+point exercises the exact same code path a real double-failure would hit.
+Operator `resume`/`take` parsing is proven too, including that
+unrecognized text from the operator's own number is silently ignored
+rather than erroring.
+
+`npm run simulate-agent`'s tool tests were also updated: `escalate_to_human`
+now asserts the conversation actually gets paused and an `escalations` row
+is written, instead of Phase 3's "it's a stub" check.
+
+### What you need to do to get the real proof
+
+1. Get real WhatsApp credentials working (Phase 2's ngrok steps).
+2. Submit the `escalation_alert` template (steps above) and wait for
+   approval.
+3. From a test enquirer number, trigger a hard escalation (e.g. send "can
+   I speak to a human") and confirm `+6580372668` receives the alert.
+4. Reply from the operator number with `resume <the enquirer's number>`
+   and confirm the bot starts responding to that enquirer again.
+5. Test the failure path deliberately: escalate while the operator hasn't
+   messaged the bot in 24h (free-form should fail) with the template not
+   yet approved (template should also fail) — confirm the loud stderr
+   block appears and `escalations.status = 'undelivered'`.
+
+**What's stubbed**: `book_appointment` calendar integration is still a
+placeholder row (unchanged from Phase 3). The no-progress guardrail counts
+tool-call presence/absence as its only signal for "progress" — a
+reasonable proxy, not a semantic judgment of whether the conversation is
+actually going anywhere. Debounce and pause state both live in server
+memory/the dry-run JSON file — fine for a single-process prototype, not
+for multiple server instances.
+
+**Biggest thing that will break first in real use**: the pre-send
+guardrail's date-commitment regex is a blunt instrument. It's tuned to
+avoid firing on "noted your preference for tomorrow" (no false positive)
+but will still over-trigger on some legitimate non-committal phrasing the
+model produces in the wild — every over-trigger means a real reply gets
+swapped for a generic fallback and an escalation gets created that a human
+didn't need to see. Watch the `escalations` table's volume and reasons
+once this runs against real traffic; a flood of `"Pre-send guardrail
+blocked..."` entries means the regex needs tightening, not that the
+system is broken.
