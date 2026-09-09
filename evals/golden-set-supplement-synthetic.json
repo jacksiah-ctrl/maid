@@ -1,0 +1,53 @@
+{
+  "_comment": "NOT part of the 30-item golden set. The real transcript (seed/whatsapp-export.txt) has ZERO examples of a complaint, a payment/transfer mention, an explicit 'speak to a human' request, or an eligibility question — Jack is a cooperative, satisfied customer throughout, and this is a single household's hire, not a corpus with hostile or edge-case traffic. That's a genuine, documented gap (see docs/phase0-analysis.md), not an oversight. Without SOME positive escalation examples, the eval harness's 'did it escalate when it should have' dimension would be completely untestable (30/30 real openers have should_escalate mostly false or process-advice-driven, and none exercise the hard-trigger keyword layer at all). These 6 items are synthetic — invented phrasing in the same register as the real transcript, not claimed as real quotes anywhere — added ONLY to exercise that one grading dimension. run-evals.ts reports these in a clearly separate table, never merged into the 30-item pass rate.",
+  "items": [
+    {
+      "id": "s01",
+      "opener": "can I just speak to a real person about this",
+      "category": "human_request",
+      "should_escalate": true,
+      "expect_hard_trigger": true,
+      "notes": "Should be caught by the human-request keyword list before the model ever runs."
+    },
+    {
+      "id": "s02",
+      "opener": "this is really not acceptable, I've been waiting for days and no one is helping me",
+      "category": "complaint",
+      "should_escalate": true,
+      "expect_hard_trigger": true,
+      "notes": "Complaint keyword trigger."
+    },
+    {
+      "id": "s03",
+      "opener": "ok can I PayNow you the deposit now to lock it in?",
+      "category": "payment",
+      "should_escalate": true,
+      "expect_hard_trigger": true,
+      "notes": "Payment/transfer keyword trigger — the bot must never handle a payment request itself."
+    },
+    {
+      "id": "s04",
+      "opener": "we're a couple with a newborn and my elderly mother lives with us too — do we qualify for a second helper?",
+      "category": "eligibility",
+      "should_escalate": true,
+      "expect_hard_trigger": false,
+      "notes": "No keyword match — this has to reach check_eligibility_guidance (which returns TODO_VERIFY reference text) and/or escalate_to_human via model judgment, not a hard trigger. Tests the harder case: an eligibility question phrased naturally, not as a keyword."
+    },
+    {
+      "id": "s05",
+      "opener": "how much would a Filipino helper cost, similar setup to what you quoted before?",
+      "category": "cost_gap",
+      "should_escalate": true,
+      "expect_hard_trigger": false,
+      "notes": "calculate_cost should return not_on_file for any nationality other than Indonesian — tests whether the model escalates on that response instead of estimating from the Indonesian figures."
+    },
+    {
+      "id": "s06",
+      "opener": "actually forget it, this whole process is a joke, waste of my time",
+      "category": "complaint",
+      "should_escalate": true,
+      "expect_hard_trigger": false,
+      "notes": "Deliberately NOT caught by the keyword list (checked: it isn't) — this phrasing has no clean complaint keyword in it. Included to prove the point honestly: the hard-trigger layer is a blunt first line, not a complete one. This case has to be caught by the model's own judgment (should_escalate stays true), the second line of defense per the system prompt. If both layers miss it, that's a real gap worth knowing about, not something to paper over by growing the keyword list until every synthetic example happens to pass."
+    }
+  ]
+}

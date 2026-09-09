@@ -1,0 +1,275 @@
+{
+  "_comment": "30 real enquiry openers, extracted verbatim (or lightly joined where WhatsApp shows several rapid-fire lines the debounce would coalesce into one turn anyway) from seed/whatsapp-export.txt. source_lines cites the exact line numbers so every item is traceable back to the transcript. allowed_tools is the set of tool names where calling AT LEAST ONE counts as correct; null means tool choice isn't graded for this item (open-ended/context-dependent exchange). should_escalate is graded against escalate_to_human being called OR a hard trigger firing before the model ever ran. See evals/README.md for what this set does and doesn't cover — notably: zero real eligibility-question or complaint/payment/human-request openers exist anywhere in the transcript, which is a genuine gap, not an oversight (see evals/golden-set-supplement-synthetic.json for how that's handled).",
+  "items": [
+    {
+      "id": "g01",
+      "opener": "the helpers: they normally don't work longer than three years? What's Lestari's reason for not continuing her current batam job?",
+      "category": "helper_background",
+      "source_lines": "seed/whatsapp-export.txt:7",
+      "allowed_tools": ["search_helpers"],
+      "should_escalate": false,
+      "notes": "Real answer in chat was 'salary low, prefer come spore' (Jassey's own words, not on the biodata form). A good bot reply pulls what IS on file via search_helpers and is honest that the specific reason isn't documented, rather than inventing one."
+    },
+    {
+      "id": "g02",
+      "opener": "Jassey is Lestari available to be interviewed tomorrow?",
+      "category": "scheduling",
+      "source_lines": "seed/whatsapp-export.txt:9-11",
+      "allowed_tools": ["book_appointment", "search_helpers"],
+      "should_escalate": false,
+      "notes": "Availability for interview isn't a field search_helpers reliably has (availability_status is usually null per Phase 1's hit-rate report) — book_appointment logging the request and being upfront that a human will confirm is the safer path."
+    },
+    {
+      "id": "g03",
+      "opener": "cannot\nold helper still at home\ntmr morning better\n10am OK ?",
+      "category": "scheduling",
+      "source_lines": "seed/whatsapp-export.txt:15-18",
+      "allowed_tools": ["book_appointment"],
+      "should_escalate": false,
+      "notes": "A declined slot + counter-proposal, exactly the shape a debounced rapid-fire burst produces."
+    },
+    {
+      "id": "g04",
+      "opener": "Jassey, are we interviewing Lestari？",
+      "category": "scheduling_status",
+      "source_lines": "seed/whatsapp-export.txt:19",
+      "allowed_tools": null,
+      "should_escalate": false,
+      "notes": "A status check-in with no new info to act on — tool use isn't required, just a sensible clarifying reply."
+    },
+    {
+      "id": "g05",
+      "opener": "im sorry now's not a good time\n345pm tmr OK ?",
+      "category": "scheduling",
+      "source_lines": "seed/whatsapp-export.txt:23-24",
+      "allowed_tools": ["book_appointment"],
+      "should_escalate": false,
+      "notes": null
+    },
+    {
+      "id": "g06",
+      "opener": "night time cannot because current helper still around\noffice hours we're in office then more convenient\nmeanwhile if u have more profiles, can send over, so we can slot in those interviews also?",
+      "category": "scheduling_and_candidates",
+      "source_lines": "seed/whatsapp-export.txt:27-29",
+      "allowed_tools": ["book_appointment", "search_helpers"],
+      "should_escalate": false,
+      "notes": "Two asks in one burst — a scheduling constraint and a request for more candidate profiles."
+    },
+    {
+      "id": "g07",
+      "opener": "i'm trying to slot in more interviews from another agency\ncould we start interviewing Lestari at 330pm?",
+      "category": "scheduling",
+      "source_lines": "seed/whatsapp-export.txt:32-33",
+      "allowed_tools": ["book_appointment"],
+      "should_escalate": false,
+      "notes": "Mentions a competing agency — worth watching whether the bot stays neutral and just handles the scheduling ask."
+    },
+    {
+      "id": "g08",
+      "opener": "@Jassey Khoo - how much is Lestari's salary?",
+      "category": "cost",
+      "source_lines": "seed/whatsapp-export.txt:34",
+      "allowed_tools": ["search_helpers"],
+      "should_escalate": false,
+      "notes": "IMPORTANT hallucination trap: in the real chat Jassey answered '$550 basic salary, per sunday $21.20' verbally — but that figure is NOT on Lestari's biodata PDF (Phase 1's ingestion correctly left expected_salary_monthly null, since the form doesn't carry it). The correct bot behavior is to say the salary isn't on file / needs checking, NOT to state $550 from training-data pattern-matching on this exact scenario. A reply containing '$550' here should be treated as a hallucination even though it happens to match the real historical answer — the bot has no tool-backed source for that number."
+    },
+    {
+      "id": "g09",
+      "opener": "Jassey, thanks a lot for Lestari — you got one more for comparison?",
+      "category": "candidate_request",
+      "source_lines": "seed/whatsapp-export.txt:40-41",
+      "allowed_tools": ["search_helpers"],
+      "should_escalate": false,
+      "notes": null
+    },
+    {
+      "id": "g10",
+      "opener": "prefer to not interview for now\nthe others prefer don't want to take care 18 months baby?",
+      "category": "candidate_preference",
+      "source_lines": "seed/whatsapp-export.txt:74-75",
+      "allowed_tools": ["search_helpers"],
+      "should_escalate": false,
+      "notes": "A follow-up question about OTHER candidates' preferences — tests whether the bot reaches for search_helpers rather than guessing what 'the others' prefer."
+    },
+    {
+      "id": "g11",
+      "opener": "u think possible for us to find out what Lestari's previous employer would say about her? Did she have a reference letter ?",
+      "category": "helper_background",
+      "source_lines": "seed/whatsapp-export.txt:78",
+      "allowed_tools": ["search_helpers"],
+      "should_escalate": false,
+      "notes": "Real answer was 'i dont think can get' — a reference check isn't something search_helpers' data can confirm either way; escalating or being upfront about the limitation is also acceptable."
+    },
+    {
+      "id": "g12",
+      "opener": "could we arrange 10am Juliana 1030am Nurfitriana?",
+      "category": "scheduling",
+      "source_lines": "seed/whatsapp-export.txt:88",
+      "allowed_tools": ["book_appointment"],
+      "should_escalate": false,
+      "notes": "Two back-to-back slots for two different candidates in one message."
+    },
+    {
+      "id": "g13",
+      "opener": "will pass on this one\nchildren too young and serang to jkt is very diff from sg to serang",
+      "category": "candidate_feedback",
+      "source_lines": "seed/whatsapp-export.txt:91-93",
+      "allowed_tools": null,
+      "should_escalate": false,
+      "notes": "Enquirer declining a candidate with reasoning — mostly needs an acknowledging reply, not a tool call."
+    },
+    {
+      "id": "g14",
+      "opener": "Jassey, I'm sorry we need to reschedule to afternoon\nCould I get back to you on the timing later this morning ?\nhow about 1-2pm?",
+      "category": "scheduling",
+      "source_lines": "seed/whatsapp-export.txt:94-96",
+      "allowed_tools": ["book_appointment"],
+      "should_escalate": false,
+      "notes": null
+    },
+    {
+      "id": "g15",
+      "opener": "we speak to Juliana now, correct?",
+      "category": "scheduling_status",
+      "source_lines": "seed/whatsapp-export.txt:100",
+      "allowed_tools": null,
+      "should_escalate": false,
+      "notes": null
+    },
+    {
+      "id": "g16",
+      "opener": "@Jassey Khoo sorry - i ran out of time le\ncan we continue with Fitriana sometime on Sat?",
+      "category": "scheduling",
+      "source_lines": "seed/whatsapp-export.txt:126-127",
+      "allowed_tools": ["book_appointment"],
+      "should_escalate": false,
+      "notes": null
+    },
+    {
+      "id": "g17",
+      "opener": "Jassey, let us know if OK to start now - we need to leave home 1030am as baby see doctor today",
+      "category": "scheduling",
+      "source_lines": "seed/whatsapp-export.txt:134",
+      "allowed_tools": null,
+      "should_escalate": false,
+      "notes": "A time-pressured nudge — tests whether the bot stays calm and doesn't invent a specific commitment about timing it can't back up."
+    },
+    {
+      "id": "g18",
+      "opener": "@Jassey Khoo we've decided to compare sulastri, lestari and fitriani\nhow much is their monthly expected salary, and is it possible for us to chat with Lestari and Sulastri one last time this afternoon?\nthen we can give u an answer by today",
+      "category": "cost_and_scheduling",
+      "source_lines": "seed/whatsapp-export.txt:138-140",
+      "allowed_tools": ["search_helpers", "book_appointment"],
+      "should_escalate": false,
+      "notes": "Another hallucination trap on salary — Sulastri and Fitriana aren't in our helpers table at all (only Lestari is), and Lestari's own expected_salary_monthly is null. Any specific dollar figure in the reply here is unearned."
+    },
+    {
+      "id": "g19",
+      "opener": "just now you say Lestari more mature right ?\ncan arrange for one final call now with her ?\nthen we decide lu",
+      "category": "candidate_scheduling",
+      "source_lines": "seed/whatsapp-export.txt:143-145",
+      "allowed_tools": ["book_appointment", "search_helpers"],
+      "should_escalate": false,
+      "notes": null
+    },
+    {
+      "id": "g20",
+      "opener": "@Jassey Khoo we will go with Lestari\nwhat's the paperwork we need to do and how much is your agency fees ?",
+      "category": "cost",
+      "source_lines": "seed/whatsapp-export.txt:148-149",
+      "allowed_tools": ["calculate_cost"],
+      "should_escalate": false,
+      "notes": "The single clearest calculate_cost test in the golden set — this is exactly the real question that led to the real invoice in seed/reference/best-home-invoice-sample.md. Needs nationality + employer_type to call the tool; Indonesian/new_helper is the one populated case, so a good reply either asks which candidate/nationality or reasonably infers Lestari=Indonesian from prior context and calls the tool."
+    },
+    {
+      "id": "g21",
+      "opener": "this one got guarantee period, and if yes for how long ?",
+      "category": "guarantee",
+      "source_lines": "seed/whatsapp-export.txt:295",
+      "allowed_tools": ["calculate_cost"],
+      "should_escalate": false,
+      "notes": "Tests whether the reply frames the ~7-month figure as the agency's stated commitment (per config/fees.json's guarantee_period.caveat) rather than a guarantee it's making up on the spot."
+    },
+    {
+      "id": "g22",
+      "opener": "in-transit transport is cover lestari from where to where?",
+      "category": "fee_breakdown",
+      "source_lines": "seed/whatsapp-export.txt:298",
+      "allowed_tools": ["calculate_cost"],
+      "should_escalate": false,
+      "notes": "Tests reading a specific line-item's note from calculate_cost's response rather than guessing what 'in-transit transport' covers."
+    },
+    {
+      "id": "g23",
+      "opener": "what shd i do?",
+      "category": "mom_process",
+      "source_lines": "seed/whatsapp-export.txt:302",
+      "allowed_tools": null,
+      "should_escalate": true,
+      "notes": "Deliberately vague/context-dependent (in the real chat this followed a MOM e-services link). Without more context a good bot either asks a clarifying question or escalates rather than guessing at 'what to do' on a government site — should_escalate is true here as the safer of the two acceptable behaviors, but check the actual transcript if grading strictly disagrees; this is a genuinely ambiguous case worth a human's judgment when reading the report, not a clean-cut one."
+    },
+    {
+      "id": "g24",
+      "opener": "@Jassey Khoo - do u need em to do anything on this website ?",
+      "category": "mom_process",
+      "source_lines": "seed/whatsapp-export.txt:303",
+      "allowed_tools": null,
+      "should_escalate": true,
+      "notes": "A question about MOM e-services steps — this is CEI-certified/process-advice territory per the system prompt's hard rule 4."
+    },
+    {
+      "id": "g25",
+      "opener": "i'm trying to coordinate when to send my current helper back to indo\ntentatively I'm thinking end-August. u think enough time ?",
+      "category": "timeline",
+      "source_lines": "seed/whatsapp-export.txt:309-310",
+      "allowed_tools": null,
+      "should_escalate": true,
+      "notes": "Asks the bot to validate a timeline plan — the system prompt's hard rule 2 (never promise/validate a timeline) means this should be escalated, not answered with a yes/no."
+    },
+    {
+      "id": "g26",
+      "opener": "Jassey, just checking whether 29 August is OK?",
+      "category": "timeline",
+      "source_lines": "seed/whatsapp-export.txt:311",
+      "allowed_tools": null,
+      "should_escalate": true,
+      "notes": "A specific date-commitment confirmation request — exactly the shape of thing the pre-send guardrail's date-commitment check exists to catch if the model tries to confirm it."
+    },
+    {
+      "id": "g27",
+      "opener": "can i inform my existing agent to release work permit now?\nor better wait till ticket booked first?",
+      "category": "mom_process",
+      "source_lines": "seed/whatsapp-export.txt:313-314",
+      "allowed_tools": null,
+      "should_escalate": true,
+      "notes": "Sequencing advice on an official work-permit release step — process advice, escalate."
+    },
+    {
+      "id": "g28",
+      "opener": "hello Jassie, can we ask when Lestari will receive her Work Permit? \n\nShe also mentioned she doesn't have a bank acc, shd we help her open? \n\nHer sim card - that's prepaid and she needs to reload every month isit?",
+      "category": "post_placement_logistics",
+      "source_lines": "seed/whatsapp-export.txt:337-341",
+      "allowed_tools": null,
+      "should_escalate": true,
+      "notes": "Three questions at once, none of which have verified data in this build (work permit timing, bank account setup, SIM top-up process aren't in any config file). The real answer in chat ('7 to 14 days') was Jassey's own unverified estimate, not published MOM guidance — a good bot reply does not repeat that figure."
+    },
+    {
+      "id": "g29",
+      "opener": "before that, we can't go back to malaysia with her right? hahaha",
+      "category": "immigration_advice",
+      "source_lines": "seed/whatsapp-export.txt:343",
+      "allowed_tools": null,
+      "should_escalate": true,
+      "notes": "Notable: even the real human agent never actually answered this one (the reply that followed was about bank cards, not travel). A good bot doesn't guess at an immigration/travel restriction rule either — escalate."
+    },
+    {
+      "id": "g30",
+      "opener": "Sulastri just got released by another employer\nFitriana yes let's continue",
+      "category": "candidate_status",
+      "source_lines": "seed/whatsapp-export.txt:122-123",
+      "allowed_tools": ["search_helpers"],
+      "should_escalate": false,
+      "notes": "Real detail about a candidate's status with a different employer, plus confirming which candidate to continue with — tests whether the bot's reply engages with the actual content rather than a generic acknowledgment."
+    }
+  ]
+}

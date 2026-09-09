@@ -17,7 +17,7 @@ one — it's not what it might look like from the file names).
 - [x] **Phase 2** — WhatsApp transport
 - [x] **Phase 3** — agent loop
 - [x] **Phase 4** — guardrails & operator handoff
-- [ ] Phase 5 — eval harness
+- [x] **Phase 5** — eval harness
 
 ## Setup
 
@@ -441,3 +441,74 @@ didn't need to see. Watch the `escalations` table's volume and reasons
 once this runs against real traffic; a flood of `"Pre-send guardrail
 blocked..."` entries means the regex needs tightening, not that the
 system is broken.
+
+## Phase 5 — eval harness
+
+`evals/golden-set.json` — 30 real enquiry openers extracted verbatim from
+`seed/whatsapp-export.txt`, each citing its exact source line(s), covering
+scheduling, candidate comparison, cost/fee questions, guarantee terms, and
+process/timeline/immigration questions that should escalate. See
+`evals/README.md` for the full design, including a documented gap: the
+real transcript has zero complaint/payment/human-request/eligibility
+content (Jack is a cooperative customer throughout), so a small, clearly
+separated **synthetic** supplement
+(`evals/golden-set-supplement-synthetic.json`, 6 items, never merged into
+the 30-item pass rate) exists solely to exercise that grading dimension.
+
+`npm run run-evals` replays every item through the real pipeline — hard
+triggers first, exactly like production, then the model loop for anything
+that doesn't hard-trigger — and writes `evals/reports/baseline.md`,
+grading each item on whether it answered, called an expected tool,
+hallucinated a figure (reusing the actual production pre-send guardrail,
+not a separate check), and escalated correctly.
+
+### What was actually proven in this sandbox, and what wasn't
+
+**No baseline pass rate exists for the 30-item real golden set.** This
+sandbox has no `ANTHROPIC_API_KEY` (same constraint as Phases 3-4,
+reconfirmed here) — every one of the 30 real openers needs a live model
+call to grade (none of them are catchable by the keyword-only hard-trigger
+layer on their own), so all 30 are honestly reported as `SKIPPED` in
+`evals/reports/baseline.md`, not estimated or padded to look like a real
+result. **This is not a shortcut around the brief's "report the baseline
+honestly" instruction — it's what honest looks like when the thing being
+measured genuinely can't run here.**
+
+What *was* proven: the harness's own mechanics. The synthetic supplement's
+hard-trigger items (`s01`, `s02`, `s03`) correctly get caught and graded
+without needing the model at all, proving the hard-trigger-bypass path
+works end to end inside the eval. Building this actually found and fixed
+a real bug before it shipped: the complaint keyword list matched
+"unacceptable" but not "not acceptable" — a synthetic test item exposed
+it, `config/escalation-rules.json` got fixed, and the item passes now
+(see `evals/README.md` for the detail, including `s06`, which is kept
+deliberately unfixed to make an honest point about the limits of
+keyword-only matching).
+
+### What you need to do to get the real baseline
+
+```bash
+ANTHROPIC_API_KEY=sk-ant-... npm run run-evals
+```
+
+Read `evals/reports/baseline.md` — every item's actual reply, tools
+called, and pass/fail is in there. Commit that report once it's real; it's
+the reference point every future system-prompt change gets diffed
+against, per the brief ("this runs before any system prompt change").
+
+**What's stubbed**: nothing new in this phase — it reuses Phases 1-4's
+tools and guardrails as-is. The "tool correctness" grading is a coarse
+"called at least one of the allowed tools" check, not a judgment of
+whether the reply's *content* was actually good — reading the per-item
+detail section of the report is still necessary, the pass/fail column is
+a triage aid, not a final verdict.
+
+**Biggest thing that will break first in real use**: once a real baseline
+runs, expect some of the 30 items graded `FAIL` for legitimate reasons
+worth reading closely rather than immediately patching the prompt for —
+in particular `g08` and `g18` are deliberately designed as hallucination
+traps (the real historical answer literally was a specific dollar figure
+Jassey said out loud, that figure isn't backed by any tool in this build,
+and a good model might reach for it anyway since it's plausible-sounding
+domain knowledge). A failure there is the guardrail doing its job, not the
+eval being broken.

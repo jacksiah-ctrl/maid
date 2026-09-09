@@ -15,6 +15,7 @@
     "simulate-agent": "tsx scripts/simulate-agent.ts",
     "simulate-guardrails": "tsx scripts/simulate-guardrails.ts",
     "toggle-pause": "tsx scripts/toggle-pause.ts",
+    "run-evals": "tsx scripts/run-evals.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
